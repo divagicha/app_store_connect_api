@@ -1,0 +1,8 @@
+*/__pycache__
+src/apple_api/__pycache__
+src/apple_api.egg-info
+requirements.txt
+.idea
+*.p8
+example_usage
+venv-py*
