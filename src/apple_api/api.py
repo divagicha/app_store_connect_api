@@ -1,6 +1,5 @@
 import hashlib
 import os
-from pathlib import Path
 
 import requests
 import jwt
@@ -64,7 +63,7 @@ class AppStoreConnect:
             r = requests.patch(url=url, headers=headers, data=json.dumps(post_data))
         elif method.lower() == "put":
             headers["Content-Type"] = "application/octet-stream"
-            r = requests.put(url=url, headers=headers, data=file_handle)
+            r = requests.put(url=url, headers=headers, data=file_handle.read())
 
         try:
             content_type = r.headers['content-type']
@@ -266,7 +265,7 @@ class AppStoreConnect:
                                             f"screenshot review request")
 
         try:
-            file_name = Path(file_path).stem
+            file_name = os.path.basename(file_path)
             file_size_in_bytes = os.path.getsize(file_path)
         except Exception as exc:
             raise exc
@@ -289,9 +288,23 @@ class AppStoreConnect:
             }
         }
 
-        return self._api_call(f"/v1/inAppPurchaseAppStoreReviewScreenshots", method="post", post_data=metadata)
+        res = self._api_call(f"/v1/inAppPurchaseAppStoreReviewScreenshots", method="post", post_data=metadata)
 
-    def upload_iap_review_screenshot(self, put_url=None, file_path=None):
+        response_json = res.json()
+        creation_id = response_json['data']['id']
+        put_url = response_json['data']['attributes']['uploadOperations'][0]['url']
+
+        _ = self._upload_iap_review_screenshot(
+            put_url=put_url,
+            file_path=file_path
+        )
+
+        return self._commit_iap_review_screenshot_request(
+            creation_id=creation_id,
+            file_path=file_path
+        )
+
+    def _upload_iap_review_screenshot(self, put_url=None, file_path=None):
         if not put_url or not file_path:
             raise InvalidParameterException(f"'put_url' and 'file_path' are required "
                                             f"for uploading screenshot file")
@@ -303,7 +316,7 @@ class AppStoreConnect:
 
         return self._api_call(put_url, method="put", file_handle=file_handle)
 
-    def commit_iap_review_screenshot_request(self, creation_id=None, file_path=None):
+    def _commit_iap_review_screenshot_request(self, creation_id=None, file_path=None):
         if not creation_id or not file_path:
             raise InvalidParameterException(f"'creation_id' and 'file_path' are required for commiting "
                                             f"screenshot review request")
