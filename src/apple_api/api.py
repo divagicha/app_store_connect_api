@@ -1,3 +1,4 @@
+import os
 import requests
 import jwt
 import gzip
@@ -10,7 +11,7 @@ from .exceptions import *
 
 ALGORITHM = 'ES256'
 BASE_API = "https://api.appstoreconnect.apple.com"
-APP_ID = "1484471377"
+APP_ID = os.getenv('APP_ID', '')
 
 
 class AppStoreConnect:
