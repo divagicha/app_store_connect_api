@@ -1,4 +1,7 @@
+import hashlib
 import os
+from pathlib import Path
+
 import requests
 import jwt
 import gzip
@@ -41,16 +44,16 @@ class AppStoreConnect:
                           headers={'kid': self.key_id, 'typ': 'JWT'}, algorithm=ALGORITHM).decode(
             'ascii')
 
-    def _api_call(self, uri, method="get", post_data=None):
-        if method not in ["get", "post", "patch"]:
-            raise MethodNotAllowedException(f"allowed values are: ['get', 'post', 'patch']")
+    def _api_call(self, uri, method="get", post_data=None, file_handle=None):
+        if method not in ["get", "post", "patch", "put"]:
+            raise MethodNotAllowedException(f"allowed values are: ['get', 'post', 'patch', 'put']")
 
         headers = {"Authorization": "Bearer %s" % self.token}
         if self._debug:
             print(uri)
         r = {}
 
-        url = BASE_API + uri
+        url = BASE_API + uri if method != 'put' else uri
         if method.lower() == "get":
             r = requests.get(url, headers=headers)
         elif method.lower() == "post":
@@ -59,8 +62,14 @@ class AppStoreConnect:
         elif method.lower() == "patch":
             headers["Content-Type"] = "application/json"
             r = requests.patch(url=url, headers=headers, data=json.dumps(post_data))
+        elif method.lower() == "put":
+            headers["Content-Type"] = "application/octet-stream"
+            r = requests.put(url=url, headers=headers, data=file_handle)
 
-        content_type = r.headers['content-type']
+        try:
+            content_type = r.headers['content-type']
+        except KeyError:
+            content_type = ''
 
         if content_type == 'application/a-gzip':
             # TODO implement stream decompress
@@ -243,6 +252,80 @@ class AppStoreConnect:
             raise InvalidParameterException(f"'iap_id' is required for listing manual price")
 
         return self._api_call(f"/v1/inAppPurchasePriceSchedules/{iap_id}/manualPrices")
+
+    def get_iap_review_screenshot_request_status(self, creation_id=None):
+        if not creation_id:
+            raise InvalidParameterException(f"'creation_id' is required for getting status of "
+                                            f"your request")
+
+        return self._api_call(f"/v1/inAppPurchaseAppStoreReviewScreenshots/{creation_id}")
+
+    def create_iap_review_screenshot_request(self, iap_id=None, file_path=None):
+        if not iap_id or not file_path:
+            raise InvalidParameterException(f"'iap_id' and 'file_path' are required for creating "
+                                            f"screenshot review request")
+
+        try:
+            file_name = Path(file_path).stem
+            file_size_in_bytes = os.path.getsize(file_path)
+        except Exception as exc:
+            raise exc
+
+        metadata = {
+            'data': {
+                'type': 'inAppPurchaseAppStoreReviewScreenshots',
+                'attributes': {
+                    'fileName': file_name,
+                    'fileSize': file_size_in_bytes
+                },
+                'relationships': {
+                    'inAppPurchaseV2': {
+                        'data': {
+                            'id': iap_id,
+                            'type': 'inAppPurchases'
+                        }
+                    }
+                }
+            }
+        }
+
+        return self._api_call(f"/v1/inAppPurchaseAppStoreReviewScreenshots", method="post", post_data=metadata)
+
+    def upload_iap_review_screenshot(self, put_url=None, file_path=None):
+        if not put_url or not file_path:
+            raise InvalidParameterException(f"'put_url' and 'file_path' are required "
+                                            f"for uploading screenshot file")
+
+        try:
+            file_handle = open(file_path, 'rb')
+        except Exception as exc:
+            raise exc
+
+        return self._api_call(put_url, method="put", file_handle=file_handle)
+
+    def commit_iap_review_screenshot_request(self, creation_id=None, file_path=None):
+        if not creation_id or not file_path:
+            raise InvalidParameterException(f"'creation_id' and 'file_path' are required for commiting "
+                                            f"screenshot review request")
+
+        try:
+            with open(file_path, 'rb') as file:
+                file_checksum = hashlib.md5(file.read()).hexdigest()
+        except Exception as exc:
+            raise exc
+
+        metadata = {
+            'data': {
+                'id': creation_id,
+                'type': 'inAppPurchaseAppStoreReviewScreenshots',
+                'attributes': {
+                    'sourceFileChecksum': file_checksum,
+                    'uploaded': True
+                }
+            }
+        }
+
+        return self._api_call(f"/v1/inAppPurchaseAppStoreReviewScreenshots/{creation_id}", method="patch", post_data=metadata)
 
     def list_profiles(self):
         return self._api_call("/v1/profiles")
