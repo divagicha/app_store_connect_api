@@ -1,4 +1,5 @@
 import hashlib
+import mimetypes
 import os
 
 import requests
@@ -43,7 +44,7 @@ class AppStoreConnect:
                           headers={'kid': self.key_id, 'typ': 'JWT'}, algorithm=ALGORITHM).decode(
             'ascii')
 
-    def _api_call(self, uri, method="get", post_data=None, file_handle=None):
+    def _api_call(self, uri, method="get", post_data=None, file_meta=None):
         if method not in ["get", "post", "patch", "put"]:
             raise MethodNotAllowedException(f"allowed values are: ['get', 'post', 'patch', 'put']")
 
@@ -62,8 +63,8 @@ class AppStoreConnect:
             headers["Content-Type"] = "application/json"
             r = requests.patch(url=url, headers=headers, data=json.dumps(post_data))
         elif method.lower() == "put":
-            headers["Content-Type"] = "application/octet-stream"
-            r = requests.put(url=url, headers=headers, data=file_handle.read())
+            headers["Content-Type"] = file_meta['content_type']
+            r = requests.put(url=url, headers=headers, data=file_meta['file'])
 
         try:
             content_type = r.headers['content-type']
@@ -314,7 +315,14 @@ class AppStoreConnect:
         except Exception as exc:
             raise exc
 
-        return self._api_call(put_url, method="put", file_handle=file_handle)
+        return self._api_call(
+            put_url,
+            method="put",
+            file_meta={
+                'content_type': mimetypes.MimeTypes().guess_type(file_path)[0],
+                'file': file_handle
+            }
+        )
 
     def _commit_iap_review_screenshot_request(self, creation_id=None, file_path=None):
         if not creation_id or not file_path:
