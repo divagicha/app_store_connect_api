@@ -2,10 +2,10 @@
 
 ### Steps to follow:
 1. `cd` into your project directory
-2. clone this git repo `git clone https://github.com/divagicha/app_store_connect_api.git`
+2. clone this git repo `git clone https://github.com/divagicha/app_store_connect_api.git apple_api`
 3. create a virtual environment using your preferred python module and activate the virtual 
    environment
-4. run command `pip install -e .`
+4. run command `pip install ./apple_api`
 5. create a python file `main.py`
 6. add following code to it 
     ```
