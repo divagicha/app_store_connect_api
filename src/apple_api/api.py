@@ -45,9 +45,6 @@ class AppStoreConnect:
             'ascii')
 
     def _api_call(self, uri, method="get", post_data=None, file_meta=None):
-        if method not in ["get", "post", "patch", "put"]:
-            raise MethodNotAllowedException(f"allowed values are: ['get', 'post', 'patch', 'put']")
-
         headers = {"Authorization": "Bearer %s" % self.token}
         if self._debug:
             print(uri)
@@ -65,6 +62,8 @@ class AppStoreConnect:
         elif method.lower() == "put":
             headers["Content-Type"] = file_meta['content_type']
             r = requests.put(url=url, headers=headers, data=file_meta['file'])
+        elif method.lower() == "delete":
+            r = requests.delete(url=url, headers=headers)
 
         try:
             content_type = r.headers['content-type']
@@ -347,6 +346,34 @@ class AppStoreConnect:
         }
 
         return self._api_call(f"/v1/inAppPurchaseAppStoreReviewScreenshots/{creation_id}", method="patch", post_data=metadata)
+
+    def delete_iap_review_screenshot(self, creation_id=None):
+        if not creation_id:
+            raise InvalidParameterException(f"'creation_id' is required "
+                                            f"for deleting screenshot file")
+
+        return self._api_call(f"/v1/inAppPurchaseAppStoreReviewScreenshots/{creation_id}", method="delete")
+
+    def submit_subscription_for_review(self, iap_id=None):
+        if not iap_id:
+            raise InvalidParameterException("'iap_id' is mandatory "
+                                            "parameters for submitting subscription request")
+
+        metadata = {
+            'data': {
+                'type': 'inAppPurchaseSubmissions',
+                'relationships': {
+                    'inAppPurchaseV2': {
+                        'data': {
+                            'id': iap_id,
+                            'type': 'inAppPurchases'
+                        }
+                    }
+                }
+            }
+        }
+
+        return self._api_call(f"/v1/inAppPurchaseSubmissions", method="post", post_data=metadata)
 
     def list_profiles(self):
         return self._api_call("/v1/profiles")
