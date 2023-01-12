@@ -181,21 +181,29 @@ class AppStoreConnect:
 
         return self._api_call(f"/v1/inAppPurchaseLocalizations", method="post", post_data=metadata)
 
-    def get_iap_price_points(self, iap_id=None):
+    def get_iap_price_points(self, iap_id=None, country_code=None):
         if not iap_id:
             raise InvalidParameterException(f"'iap_id' is required for listing price points")
 
-        return self._api_call(f"/v2/inAppPurchases/{iap_id}/pricePoints")
+        territory_filter = ""
+        if country_code:
+            territory_filter = f"&filter[territory]={country_code}"     # country_code should be 3 letter ISO3 country code
+
+        return self._api_call(f"/v2/inAppPurchases/{iap_id}/pricePoints?include=territory{territory_filter}")
 
     def get_iap_price_schedules(self, iap_id=None):
         if not iap_id:
             raise InvalidParameterException(f"'iap_id' is required for listing price schedules")
 
-        return self._api_call(f"/v1/inAppPurchasePriceSchedules/{iap_id}")
+        # return self._api_call(f"/v1/inAppPurchasePriceSchedules/{iap_id}?include=manualPrices")
+        return self._api_call(f"/v2/inAppPurchases/{iap_id}/iapPriceSchedule?include=manualPrices")
 
-    def create_iap_price_schedule(self, iap_id=None, price_point_id=None, price=None):
+    def create_iap_price_schedule(self, iap_id=None, price_point_id=None, price=None, start_date=None):
         if not iap_id:
             raise InvalidParameterException(f"'iap_id' is required for listing price schedules")
+
+        # if not start_date:
+        #     start_date = datetime.now().strftime("%Y-%m-%d")
 
         metadata = {
             'data': {
@@ -224,7 +232,7 @@ class AppStoreConnect:
                     'id': f"${price}",
                     'type': 'inAppPurchasePrices',
                     'attributes': {
-                        'startDate': None,
+                        'startDate': start_date,
                     },
                     'relationships': {
                         'inAppPurchasePricePoint': {
@@ -246,18 +254,21 @@ class AppStoreConnect:
 
         return self._api_call(f"/v1/inAppPurchasePriceSchedules", method="post", post_data=metadata)
 
-    def get_iap_manual_prices(self, iap_id=None):
+    def get_iap_manual_prices(self, iap_id=None, country_code='IND'):
         if not iap_id:
             raise InvalidParameterException(f"'iap_id' is required for listing manual price")
 
-        return self._api_call(f"/v1/inAppPurchasePriceSchedules/{iap_id}/manualPrices")
+        return self._api_call(f"/v1/inAppPurchasePriceSchedules/"
+                              f"{iap_id}/manualPrices?include=inAppPurchasePricePoint,"
+                              f"territory&filter[territory]={country_code}")
 
-    def get_iap_review_screenshot_request_status(self, creation_id=None):
-        if not creation_id:
-            raise InvalidParameterException(f"'creation_id' is required for getting status of "
+    def get_iap_review_screenshot_request_status(self, iap_id=None):
+        if not iap_id:
+            raise InvalidParameterException(f"'iap_id' is required for getting status of "
                                             f"your request")
 
-        return self._api_call(f"/v1/inAppPurchaseAppStoreReviewScreenshots/{creation_id}")
+        # return self._api_call(f"/v1/inAppPurchaseAppStoreReviewScreenshots/{creation_id}")
+        return self._api_call(f"/v2/inAppPurchases/{iap_id}/appStoreReviewScreenshot")
 
     def create_iap_review_screenshot_request(self, iap_id=None, file_path=None):
         if not iap_id or not file_path:
