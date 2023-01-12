@@ -193,7 +193,7 @@ class AppStoreConnect:
 
         return self._api_call(f"/v1/inAppPurchasePriceSchedules/{iap_id}")
 
-    def create_iap_price_schedule(self, iap_id=None, price=None):
+    def create_iap_price_schedule(self, iap_id=None, price_point_id=None, price=None):
         if not iap_id:
             raise InvalidParameterException(f"'iap_id' is required for listing price schedules")
 
@@ -229,7 +229,7 @@ class AppStoreConnect:
                     'relationships': {
                         'inAppPurchasePricePoint': {
                             'data': {
-                                'id': "eyJzIjoiNjQ0NTM1MDg1NyIsInQiOiJBRkciLCJwIjoiNTkwIn0",    # 4.99
+                                'id': price_point_id,
                                 'type': 'inAppPurchasePricePoints'
                             }
                         },
@@ -354,10 +354,10 @@ class AppStoreConnect:
 
         return self._api_call(f"/v1/inAppPurchaseAppStoreReviewScreenshots/{creation_id}", method="delete")
 
-    def submit_subscription_for_review(self, iap_id=None):
+    def submit_nr_subscription_for_review(self, iap_id=None):
         if not iap_id:
             raise InvalidParameterException("'iap_id' is mandatory "
-                                            "parameters for submitting subscription request")
+                                            "parameter for submitting subscription request")
 
         metadata = {
             'data': {
@@ -374,6 +374,99 @@ class AppStoreConnect:
         }
 
         return self._api_call(f"/v1/inAppPurchaseSubmissions", method="post", post_data=metadata)
+
+    def list_subscription_groups(self):
+        return self._api_call(f"/v1/apps/{os.getenv('APP_ID')}/subscriptionGroups")
+
+    def get_subscription_group(self, sg_id=None):
+        if not sg_id:
+            raise InvalidParameterException("'sg_id' is mandatory parameter for fetching "
+                                            "subscription group info")
+
+        return self._api_call(f"/v1/subscriptionGroups/{sg_id}")
+
+    def create_subscription_group(self, name=None):
+        if not name:
+            raise InvalidParameterException("'name' is mandatory parameter for creating "
+                                            "subscription group")
+
+        metadata = {
+            'data': {
+                'type': 'subscriptionGroups',
+                'attributes': {
+                    'referenceName': name
+                },
+                'relationships': {
+                    'app': {
+                        'data': {
+                            'id': os.getenv('APP_ID'),
+                            'type': 'apps'
+                        }
+                    }
+                }
+            }
+        }
+
+        return self._api_call(f"/v1/subscriptionGroups", method="post", post_data=metadata)
+
+    def delete_subscription_group(self, sg_id=None):
+        if not sg_id:
+            raise InvalidParameterException("'sg_id' is mandatory parameter for deleting a "
+                                            "subscription group")
+
+        return self._api_call(f"/v1/subscriptionGroups/{sg_id}", method="delete")
+
+    def list_subscription_group_localizations(self, sg_id=None):
+        if not sg_id:
+            raise InvalidParameterException("'sg_id' is mandatory parameter for fetching all "
+                                            "localizations for a subscription group")
+
+        return self._api_call(f"/v1/subscriptionGroups/{sg_id}/subscriptionGroupLocalizations")
+
+    def list_subscriptions_in_a_group(self, sg_id=None):
+        if not sg_id:
+            raise InvalidParameterException("'sg_id' is mandatory parameter for fetching all "
+                                            "subscriptions inside a group")
+
+        return self._api_call(f"/v1/subscriptionGroups/{sg_id}/subscriptions")
+
+    def create_ar_subscription(self, sg_id=None, name=None, product_id=None,
+                               subscription_period=None, group_level: int = None, review_note=None):
+        if not sg_id or not name or not product_id or not subscription_period or not group_level:
+            raise InvalidParameterException("'sg_id', 'name', 'product_id', 'subscription_period' "
+                                            "and 'group_level' are mandatory parameters for "
+                                            "creating an auto-renewable subscription")
+
+        valid_subscription_periods = ['ONE_WEEK', 'ONE_MONTH', 'TWO_MONTHS', 'THREE_MONTHS',
+                                      'SIX_MONTHS', 'ONE_YEAR']
+        if subscription_period not in valid_subscription_periods:
+            raise InvalidParameterException("invalid value provided for parameter "
+                                            f"'subscription_period'. Possible values: {valid_subscription_periods}")
+
+        metadata = {
+            'data': {
+                'type': 'subscriptions',
+                'attributes': {
+                    'name': name,
+                    'productId': product_id,
+                    'subscriptionPeriod': subscription_period,
+                    # 'groupLevel': group_level,
+                    'familySharable': False,
+                    'availableInAllTerritories': True,
+                    'reviewNote': review_note
+                },
+                'relationships': {
+                    'group': {
+                        'data': {
+                            'id': sg_id,
+                            'type': 'subscriptionGroups'
+                        }
+                    }
+                }
+            }
+        }
+
+        return self._api_call(f"/v1/subscriptions", method="post", post_data=metadata)
 
     def list_profiles(self):
         return self._api_call("/v1/profiles")
