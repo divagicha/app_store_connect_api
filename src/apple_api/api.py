@@ -14,17 +14,18 @@ from .exceptions import *
 
 ALGORITHM = 'ES256'
 BASE_API = "https://api.appstoreconnect.apple.com"
-APP_ID = os.getenv('APP_ID', '')
 
 
 class AppStoreConnect:
-    def __init__(self, key_id, key_file, issuer_id):
+    def __init__(self, key_id, key_file, issuer_id, app_id=None, bundle_id=None):
         self._token = None
         self.token_gen_date = None
         self.exp = None
         self.key_id = key_id
         self.key_file = key_file
         self.issuer_id = issuer_id
+        self.app_id = app_id
+        self.bundle_id = bundle_id
         self._debug = False
         token = self.token  # generate first token
 
@@ -40,9 +41,20 @@ class AppStoreConnect:
         key = open(self.key_file, 'r').read()
         self.token_gen_date = datetime.now()
         exp = int(time.mktime((self.token_gen_date + timedelta(minutes=20)).timetuple()))
-        return jwt.encode({'iss': self.issuer_id, 'exp': exp, 'aud': 'appstoreconnect-v1'}, key,
-                          headers={'kid': self.key_id, 'typ': 'JWT'}, algorithm=ALGORITHM).decode(
-            'ascii')
+        return jwt.encode(
+            payload={
+                'iss': self.issuer_id,
+                'exp': exp,
+                'aud': 'appstoreconnect-v1',
+                'bid': self.bundle_id
+            },
+            key=key,
+            headers={
+                'kid': self.key_id,
+                'typ': 'JWT'
+            },
+            algorithm=ALGORITHM
+        ).decode('ascii')
 
     def _api_call(self, uri, method="get", post_data=None, file_meta=None):
         headers = {"Authorization": "Bearer %s" % self.token}
@@ -50,7 +62,7 @@ class AppStoreConnect:
             print(uri)
         r = {}
 
-        url = BASE_API + uri if method != 'put' else uri
+        url = BASE_API + uri if method != 'put' and 'api.storekit' not in uri else uri
         if method.lower() == "get":
             r = requests.get(url, headers=headers)
         elif method.lower() == "post":
@@ -139,7 +151,7 @@ class AppStoreConnect:
                 'relationships': {
                     'app': {
                         'data': {
-                            'id': APP_ID,
+                            'id': self.app_id,
                             'type': 'apps'
                         }
                     }
@@ -387,7 +399,7 @@ class AppStoreConnect:
         return self._api_call(f"/v1/inAppPurchaseSubmissions", method="post", post_data=metadata)
 
     def list_subscription_groups(self):
-        return self._api_call(f"/v1/apps/{os.getenv('APP_ID')}/subscriptionGroups")
+        return self._api_call(f"/v1/apps/{self.app_id}/subscriptionGroups")
 
     def get_subscription_group(self, sg_id=None):
         if not sg_id:
@@ -410,7 +422,7 @@ class AppStoreConnect:
                 'relationships': {
                     'app': {
                         'data': {
-                            'id': os.getenv('APP_ID'),
+                            'id': self.app_id,
                             'type': 'apps'
                         }
                     }
